@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { getDashboardStats } from "../api/dashboardApi";
-import Navbar from "../components/Navbar";
 import { useNavigate } from "react-router-dom";
 
 

@@ -19,10 +19,8 @@ from app import models
 from app.database import engine
 import os
 
-print("DATABASE_URL =", os.getenv("DATABASE_URL"))
 app=FastAPI()
 
-print(models.Base.metadata.tables.keys())
 models.Base.metadata.create_all(bind=engine)
 app.add_middleware(
     CORSMiddleware,

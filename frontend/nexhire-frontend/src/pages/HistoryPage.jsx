@@ -1,19 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
-import {
-  getHistory,
-  getInterviewDetails,
-} from "../api/historyApi";
+import { getHistory } from "../api/historyApi";
 
 // import Navbar from "../components/Navbar";
 import HistorySessionRow from "../components/history/HistorySessionRow";
 
 function HistoryPage() {
   const [sessions, setSessions] = useState([]);
-  
-
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchHistory = async () => {
