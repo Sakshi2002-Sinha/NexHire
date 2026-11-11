@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.dependencies import get_db
+from app.utils import load_list
 
 from app.models import (
     User,
@@ -101,6 +102,8 @@ def get_dashboard_stats(
             )
         )
 
+    score_over_time.sort(key=lambda point: point.date)
+
     answers = (
         db.query(Answer)
         .join(
@@ -121,14 +124,10 @@ def get_dashboard_stats(
 
     for answer in answers:
 
-        if not answer.improvements:
-            continue
+        # Count whole improvement items; splitting on commas cut sentences apart.
+        for item in load_list(answer.improvements):
 
-        items = answer.improvements.split(",")
-
-        for item in items:
-
-            item = item.strip().lower()
+            item = item.strip().rstrip(".")
 
             if item:
                 counter[item] += 1

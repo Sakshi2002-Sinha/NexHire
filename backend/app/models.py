@@ -15,7 +15,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     name = Column(String(100), nullable=False)
-    created_at = Column(DateTime, default=datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     
     
     
@@ -41,7 +41,7 @@ class InterviewSession(Base):
     total_score = Column(Float, nullable=True)
     created_at = Column(
         DateTime,
-        default=datetime.now(UTC)
+        default=lambda: datetime.now(UTC)
     )
 
     completed_at = Column(
@@ -82,7 +82,7 @@ class Question(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.now(UTC)
+        default=lambda: datetime.now(UTC)
 
     )
 
@@ -149,7 +149,7 @@ class Answer(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.now(UTC)
+        default=lambda: datetime.now(UTC)
     )
     
 class Resume(Base):
@@ -177,5 +177,5 @@ class Resume(Base):
 
     uploaded_at = Column(
         DateTime,
-        default=datetime.now(UTC)
+        default=lambda: datetime.now(UTC)
     )
