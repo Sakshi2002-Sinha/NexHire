@@ -8,26 +8,33 @@ import {
   submitAnswerApi,
   endInterviewApi,
 } from "../api/interviewApi";
+import { getErrorMessage } from "../api/errorMessage";
+
+const errorMessage = (err) =>
+  getErrorMessage(err, err.message || undefined);
 
 export const startInterview = createAsyncThunk(
   "interview/startInterview",
-  async (data) => {
-    return await startInterviewApi(data);
-  }
+  (data, { rejectWithValue }) =>
+    startInterviewApi(data).catch((err) =>
+      rejectWithValue(errorMessage(err))
+    )
 );
 
 export const submitAnswer = createAsyncThunk(
   "interview/submitAnswer",
-  async (data) => {
-    return await submitAnswerApi(data);
-  }
+  (data, { rejectWithValue }) =>
+    submitAnswerApi(data).catch((err) =>
+      rejectWithValue(errorMessage(err))
+    )
 );
 
 export const endInterview = createAsyncThunk(
   "interview/endInterview",
-  async (data) => {
-    return await endInterviewApi(data);
-  }
+  (data, { rejectWithValue }) =>
+    endInterviewApi(data).catch((err) =>
+      rejectWithValue(errorMessage(err))
+    )
 );
 
 const initialState = {
@@ -97,7 +104,7 @@ const interviewSlice = createSlice({
         startInterview.rejected,
         (state, action) => {
           state.isLoading = false;
-          state.error = action.error.message;
+          state.error = action.payload || action.error.message;
         }
       )
 
@@ -163,7 +170,7 @@ const interviewSlice = createSlice({
         submitAnswer.rejected,
         (state, action) => {
           state.isLoading = false;
-          state.error = action.error.message;
+          state.error = action.payload || action.error.message;
         }
       )
 
@@ -196,7 +203,7 @@ const interviewSlice = createSlice({
         endInterview.rejected,
         (state, action) => {
           state.isLoading = false;
-          state.error = action.error.message;
+          state.error = action.payload || action.error.message;
         }
       );
   },

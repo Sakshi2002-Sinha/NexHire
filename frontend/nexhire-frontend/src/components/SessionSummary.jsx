@@ -1,4 +1,7 @@
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+
+import { resetInterview } from "../store/interviewSlice";
 
 function SessionSummary({
   totalScore,
@@ -6,6 +9,13 @@ function SessionSummary({
   improvements,
 }) {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  // Clear the finished interview so the next visit starts fresh.
+  const leaveTo = (path) => {
+    dispatch(resetInterview());
+    navigate(path);
+  };
 
   return (
     <div
@@ -94,7 +104,7 @@ function SessionSummary({
 
       <div className="mt-6 flex gap-2">
         <button
-          onClick={() => navigate("/dashboard")}
+          onClick={() => leaveTo("/dashboard")}
           className="
             flex-1
             px-4 py-2
@@ -108,7 +118,7 @@ function SessionSummary({
         </button>
 
         <button
-          onClick={() => navigate("/interview")}
+          onClick={() => leaveTo("/interview")}
           className="
             flex-1
             px-4 py-2

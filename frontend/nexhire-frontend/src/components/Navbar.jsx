@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -7,7 +8,9 @@ import {
   LogOut,
 } from "lucide-react";
 
-import { logout } from "../store/authSlice";
+import axiosClient from "../api/axiosClient";
+import { loginSuccess, logout } from "../store/authSlice";
+import { resetInterview } from "../store/interviewSlice";
 
 function Navbar() {
   const dispatch = useDispatch();
@@ -17,15 +20,31 @@ function Navbar() {
     (state) => state.auth.user
   );
 
-const token =
-  useSelector((state) => state.auth.token) ||
-  localStorage.getItem("token");
+  const token =
+    useSelector((state) => state.auth.token) ||
+    localStorage.getItem("token");
+
+  // The user isn't persisted, so reload it after a page refresh.
+  useEffect(() => {
+    if (!token || user) return;
+
+    axiosClient
+      .get("/me")
+      .then((res) =>
+        dispatch(loginSuccess({ token, user: res.data }))
+      )
+      .catch(() => {
+        // A 401 is handled by the axios interceptor.
+      });
+  }, [token, user, dispatch]);
+
   const initials =
     user?.name?.charAt(0)?.toUpperCase() || "U";
 
   const handleLogout = () => {
     localStorage.removeItem("token");
 
+    dispatch(resetInterview());
     dispatch(logout());
 
     navigate("/login");

@@ -1,11 +1,12 @@
+import { Fragment } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useState } from "react";
 
 import RoleSelector from "../components/RoleSelector";
 import QuestionCard from "../components/QuestionCard";
 import AnswerInput from "../components/AnswerInput";
 import FeedbackPanel from "../components/FeedbackPanel";
 import SessionSummary from "../components/SessionSummary";
+import { MAX_QUESTIONS } from "../constants";
 
 import {
 endInterview,
@@ -24,33 +25,8 @@ sessionStatus,
 totalScore,
 summary,
 isLoading,
+error,
 } = useSelector((state) => state.interview);
-
-const [resume, setResume] = useState(null);
-const [uploading, setUploading] = useState(false);
-
-const handleResumeUpload = async (e) => {
-  const file = e.target.files[0];
-
-  if (!file) return;
-
-  const formData = new FormData();
-
-  formData.append("file", file);
-
-  try {
-    setUploading(true);
-
-    const data = await uploadResumeApi(formData);
-
-    setResume(data);
-
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setUploading(false);
-  }
-};
 
 // Completed Interview
 if (sessionStatus === "completed") {
@@ -83,9 +59,18 @@ Mock Interview </h1>
         px-5 py-4
       "
     >
-      {/* <p className="text-[13px] text-slate-500">
-        AI is reviewing your answer...
-      </p> */}
+      <p className="text-[13px] text-slate-500">
+        Working on it...
+      </p>
+    </div>
+  )}
+
+  {/* Error State */}
+  {error && (
+    <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
+      <p className="text-[13px] text-red-700">
+        {error}
+      </p>
     </div>
   )}
 
@@ -97,15 +82,32 @@ Mock Interview </h1>
     <div className="max-w-4xl">
       {/* Progress Indicator */}
       <div className="mb-5 flex items-center">
-        <div className="h-2 w-2 rounded-full bg-indigo-600 ring-4 ring-indigo-100" />
+        {Array.from({ length: MAX_QUESTIONS }, (_, i) => {
+          const number = i + 1;
+          const isCurrent = number === currentQuestion.number;
+          const isDone = number < currentQuestion.number;
 
-        <div className="mx-2 h-px flex-1 bg-slate-200" />
-
-        <div className="h-2 w-2 rounded-full bg-slate-200" />
-
-        <div className="mx-2 h-px flex-1 bg-slate-200" />
-
-        <div className="h-2 w-2 rounded-full bg-slate-200" />
+          return (
+            <Fragment key={number}>
+              {i > 0 && (
+                <div
+                  className={`mx-2 h-px flex-1 ${
+                    isDone || isCurrent ? "bg-indigo-300" : "bg-slate-200"
+                  }`}
+                />
+              )}
+              <div
+                className={`h-2 w-2 rounded-full ${
+                  isCurrent
+                    ? "bg-indigo-600 ring-4 ring-indigo-100"
+                    : isDone
+                      ? "bg-indigo-400"
+                      : "bg-slate-200"
+                }`}
+              />
+            </Fragment>
+          );
+        })}
       </div>
 
       {/* Question */}
