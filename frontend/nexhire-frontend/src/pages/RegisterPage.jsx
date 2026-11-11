@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import axiosClient from "../api/axiosClient";
+import { getErrorMessage } from "../api/errorMessage";
 
 function RegisterPage() {
   const navigate = useNavigate();
@@ -36,8 +37,7 @@ function RegisterPage() {
       navigate("/login");
     } catch (error) {
       setError(
-        error.response?.data?.detail ||
-          "Registration failed"
+        getErrorMessage(error, "Registration failed")
       );
     } finally {
       setIsLoading(false);

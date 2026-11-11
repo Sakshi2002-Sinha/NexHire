@@ -16,6 +16,20 @@ genai.configure(
 )
 
 
+def _to_score(value):
+    """Coerce an AI score to an int in 0-10."""
+    try:
+        return max(0, min(10, int(round(float(value)))))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _to_str_list(value):
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
 def get_gemini_client():
     return genai.GenerativeModel(
         "gemini-2.5-flash"
@@ -50,6 +64,8 @@ Candidate Projects:
 {projects}
 """
 
+    asked = "\n".join(f"- {q}" for q in history) or "None"
+
     model = get_gemini_client()
 
     prompt = f"""
@@ -65,8 +81,8 @@ Difficulty:
 
 {resume_context}
 
-Asked Questions:
-{history}
+Already Asked Questions (do not repeat or rephrase these):
+{asked}
 
 Rules:
 
@@ -92,28 +108,14 @@ Return only the question.
             prompt
         )
 
-        return response.text.strip()
+        return response.text.strip() or None
 
     except Exception as e:
+        # Caller picks a canned question that hasn't been asked yet.
         print(
             f"Error generating question: {e}"
         )
-
-        fallback_questions = {
-            "ML Engineer":
-                "Explain the bias-variance tradeoff.",
-            "SDE":
-                "Explain the difference between a stack and a queue.",
-            "Frontend Developer":
-                "What are React hooks and why are they useful?",
-            "Backend Developer":
-                "What is dependency injection?",
-        }
-
-        return fallback_questions.get(
-            role,
-            f"Explain an important concept in {role}."
-        )
+        return None
 
 
 def evaluate_answer(
@@ -179,38 +181,14 @@ Role:
         result = json.loads(text)
 
         return {
-            "score": result.get(
-                "score",
-                0
-            ),
-            "communication": result.get(
-                "communication",
-                0
-            ),
-            "technical_depth": result.get(
-                "technical_depth",
-                0
-            ),
-            "problem_solving": result.get(
-                "problem_solving",
-                0
-            ),
-            "confidence": result.get(
-                "confidence",
-                0
-            ),
-            "feedback": result.get(
-                "feedback",
-                ""
-            ),
-            "strengths": result.get(
-                "strengths",
-                []
-            ),
-            "improvements": result.get(
-                "improvements",
-                []
-            )
+            "score": _to_score(result.get("score")),
+            "communication": _to_score(result.get("communication")),
+            "technical_depth": _to_score(result.get("technical_depth")),
+            "problem_solving": _to_score(result.get("problem_solving")),
+            "confidence": _to_score(result.get("confidence")),
+            "feedback": str(result.get("feedback") or ""),
+            "strengths": _to_str_list(result.get("strengths")),
+            "improvements": _to_str_list(result.get("improvements")),
         }
 
     except json.JSONDecodeError as e:

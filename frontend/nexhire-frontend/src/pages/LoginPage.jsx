@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, Link } from "react-router-dom";
 
 import axiosClient from "../api/axiosClient";
+import { getErrorMessage } from "../api/errorMessage";
 
 import {
   loginStart,
@@ -77,8 +78,7 @@ function LoginPage() {
     } catch (error) {
       dispatch(
         loginFailure(
-          error.response?.data?.detail ||
-            "Login failed"
+          getErrorMessage(error, "Login failed")
         )
       );
     }

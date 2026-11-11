@@ -11,7 +11,6 @@ from sqlalchemy.orm import sessionmaker
 # Create a SQLAlchemy engine
 engine = create_engine(DATABASE_URL)
 
-print("DATABASE_URL =", DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # add base
