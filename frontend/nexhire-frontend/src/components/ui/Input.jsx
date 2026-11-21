@@ -1,23 +1,14 @@
-function Input({
-  label,
-  type = "text",
-  value,
-  onChange,
-  placeholder,
-}) {
+import { useId } from "react";
+
+function Input({ label, hint, ...props }) {
+  const id = useId();
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium">
         {label}
       </label>
-
-      <input
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500"
-      />
+      <input id={id} className="field" {...props} />
+      {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
     </div>
   );
 }

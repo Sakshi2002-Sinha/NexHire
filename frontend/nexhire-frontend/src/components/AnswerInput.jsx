@@ -1,205 +1,102 @@
-
-import { useState, useRef } from "react";
+import { Mic, Send, Square } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 import { submitAnswer } from "../store/interviewSlice";
 
+const MAX_LENGTH = 8000;
+const draftKey = (questionId) => `nexhire-draft-${questionId}`;
+
 function AnswerInput() {
   const dispatch = useDispatch();
-
-  const [answer, setAnswer] = useState("");
-  const [isListening, setIsListening] =
-    useState(false);
-
+  const { sessionId, currentQuestion, pending } = useSelector((state) => state.interview);
+  const isSubmitting = pending === "answer";
+  // A draft survives refresh; sessionStorage is cleared when the tab closes.
+  const [answer, setAnswer] = useState(() => sessionStorage.getItem(draftKey(currentQuestion.id)) || "");
+  const [isListening, setIsListening] = useState(false);
+  const [voiceError, setVoiceError] = useState(null);
   const recognitionRef = useRef(null);
 
-  const {
-    sessionId,
-    currentQuestion,
-    isLoading,
-  } = useSelector(
-    (state) => state.interview
-  );
+  useEffect(() => {
+    sessionStorage.setItem(draftKey(currentQuestion.id), answer);
+  }, [answer, currentQuestion.id]);
+
+  useEffect(() => () => recognitionRef.current?.abort(), []);
 
   const startListening = () => {
-    const SpeechRecognition =
-      window.SpeechRecognition ||
-      window.webkitSpeechRecognition;
-
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert(
-        "Speech recognition is not supported in this browser."
-      );
+      setVoiceError("Voice input needs Chrome or Edge. You can still type your answer.");
       return;
     }
-
-    const recognition =
-      new SpeechRecognition();
-
+    setVoiceError(null);
+    const recognition = new SpeechRecognition();
     recognition.lang = "en-US";
     recognition.continuous = true;
     recognition.interimResults = false;
-
-    recognitionRef.current =
-      recognition;
-
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
     recognition.onerror = (event) => {
-      console.error(
-        "Speech recognition error:",
-        event.error
-      );
-
       setIsListening(false);
+      if (event.error === "not-allowed") setVoiceError("Microphone access was blocked.");
+      else if (event.error !== "aborted" && event.error !== "no-speech") setVoiceError("Voice input stopped.");
     };
-
     recognition.onresult = (event) => {
-      const transcript =
-        Array.from(event.results)
-          .map(
-            (result) =>
-              result[0].transcript
-          )
-          .join(" ");
-
-      setAnswer(transcript);
+      // Only new results are appended, so anything already typed is preserved.
+      let spoken = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        if (event.results[i].isFinal) spoken += event.results[i][0].transcript;
+      }
+      if (spoken) setAnswer((text) => `${text}${text && !text.endsWith(" ") ? " " : ""}${spoken.trim()}`);
     };
-
+    recognitionRef.current = recognition;
     recognition.start();
   };
 
-  const stopListening = () => {
+  const handleSubmit = async () => {
+    const text = answer.trim();
+    if (!text || isSubmitting) return;
     recognitionRef.current?.stop();
-  };
-
-  const handleSubmit = () => {
-    if (isLoading) return;
-
-    if (!answer.trim()) return;
-
-    dispatch(
-      submitAnswer({
-        session_id: sessionId,
-        question_id: currentQuestion.id,
-        answer,
-      })
+    const action = await dispatch(
+      submitAnswer({ session_id: sessionId, question_id: currentQuestion.id, answer: text })
     );
-
-    setAnswer("");
+    // Clear only on success, so a failed request never loses what the candidate wrote.
+    if (submitAnswer.fulfilled.match(action)) sessionStorage.removeItem(draftKey(currentQuestion.id));
   };
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6">
+    <section className="card">
+      <label htmlFor="answer" className="mb-2 block text-sm font-medium">Your answer</label>
       <textarea
-        className="
-          w-full
-          h-[110px]
-          border border-slate-200
-          rounded-lg
-          px-3.5 py-3
-          text-[14px]
-          resize-none
-          bg-white
-          text-slate-900
-          outline-none
-          focus:border-indigo-600
-        "
-        placeholder="Type your answer here..."
+        id="answer"
+        className="field min-h-44 resize-y leading-relaxed"
+        placeholder="Explain your reasoning, the trade-offs, and an example if you have one."
         value={answer}
-        onChange={(e) =>
-          setAnswer(e.target.value)
-        }
+        maxLength={MAX_LENGTH}
+        disabled={isSubmitting}
+        onChange={(e) => setAnswer(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSubmit();
+        }}
       />
-
-      <p className="text-xs text-slate-400 mt-1.5 mb-4">
-        Provide a detailed answer with examples where possible.
-      </p>
-
-      <div className="flex flex-wrap items-center gap-3">
-        {!isListening ? (
-          <button
-            type="button"
-            onClick={startListening}
-            className="
-              inline-flex items-center gap-2
-              px-4 py-2
-              rounded-lg
-              border border-slate-300
-              bg-white
-              text-slate-700
-              text-[13px]
-              hover:bg-slate-50
-            "
-          >
-            🎤 Speak Answer
+      <div className="mt-1 text-right text-xs text-muted tabular-nums">{answer.length}/{MAX_LENGTH}</div>
+      {voiceError && <p role="alert" className="mb-2 text-sm text-danger">{voiceError}</p>}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+        {isListening ? (
+          <button type="button" onClick={() => recognitionRef.current?.stop()} className="btn-secondary text-danger">
+            <Square size={14} /> Stop recording
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={stopListening}
-            className="
-              inline-flex items-center gap-2
-              px-4 py-2
-              rounded-lg
-              bg-red-500
-              text-white
-              text-[13px]
-              hover:bg-red-600
-            "
-          >
-            ⏹ Stop Recording
+          <button type="button" onClick={startListening} disabled={isSubmitting} className="btn-secondary">
+            <Mic size={15} /> Speak answer
           </button>
         )}
-
-        <button
-          onClick={handleSubmit}
-          disabled={isLoading}
-          className="
-            inline-flex items-center gap-1.5
-            px-4 py-2
-            rounded-lg
-            border border-indigo-600
-            bg-indigo-600
-            text-white
-            text-[13px]
-            hover:bg-indigo-700
-            disabled:opacity-50
-          "
-        >
-          {isLoading
-            ? "Evaluating..."
-            : "Submit Answer"}
+        <button onClick={handleSubmit} disabled={isSubmitting || !answer.trim()} className="btn-primary">
+          <Send size={15} /> {isSubmitting ? "Evaluating..." : "Submit answer"}
         </button>
       </div>
-
-      {isListening && (
-        <div
-          className="
-            mt-3
-            inline-flex items-center gap-2
-            rounded-lg
-            bg-red-50
-            px-3 py-2
-            text-sm
-            text-red-600
-          "
-        >
-          <span className="animate-pulse">
-            🔴
-          </span>
-          Listening...
-        </div>
-      )}
-    </div>
+    </section>
   );
 }
 
 export default AnswerInput;
-

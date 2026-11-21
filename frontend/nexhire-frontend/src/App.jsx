@@ -1,91 +1,53 @@
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
-import LoginPage from "./pages/LoginPage";
-import DashboardPage from "./pages/DashboardPage";
 import ProtectedRoute from "./components/ProtectedRoute";
-import HistoryPage from "./pages/HistoryPage";
-import RegisterPage from "./pages/RegisterPage";
-import InterviewPage from "./pages/InterviewPage";
-import HistoryDetailsPage from "./pages/HistoryDetailsPage";
+import { Loading } from "./components/ui/States";
 import AppLayout from "./layouts/AppLayout";
+import LandingPage from "./pages/LandingPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import { fetchMe } from "./store/authSlice";
+
+// Charts are the heaviest dependency, so these pages load only when visited.
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const InterviewPage = lazy(() => import("./pages/InterviewPage"));
+const HistoryPage = lazy(() => import("./pages/HistoryPage"));
+const HistoryDetailsPage = lazy(() => import("./pages/HistoryDetailsPage"));
 
 function App() {
+  const dispatch = useDispatch();
+  const { token, user } = useSelector((state) => state.auth);
+
+  useEffect(() => {
+    if (token && !user) dispatch(fetchMe());
+  }, [dispatch, token, user]);
+
+  const guestOnly = (page) => (token ? <Navigate to="/dashboard" replace /> : page);
+
   return (
     <BrowserRouter>
-      <Routes>
-
-        <Route
-            path="/history"
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/" element={guestOnly(<LandingPage />)} />
+          <Route path="/login" element={guestOnly(<LoginPage />)} />
+          <Route path="/register" element={guestOnly(<RegisterPage />)} />
+          <Route
             element={
               <ProtectedRoute>
-                <AppLayout>
-                  <HistoryPage />
-                </AppLayout>
+                <AppLayout />
               </ProtectedRoute>
             }
-          />
-
-        <Route
-          path="/"
-          element={<Navigate to="/login" />}
-        />
-         
-        <Route
-  path="/register"
-  element={
-    <AppLayout>
-      <RegisterPage />
-    </AppLayout>
-  }
-/>
-
-<Route
-  path="/login"
-  element={
-    <AppLayout>
-      <LoginPage />
-    </AppLayout>
-  }
-/>
-
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <DashboardPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/interview"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <InterviewPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/history/:sessionId"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <HistoryDetailsPage />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-
-      </Routes>
+          >
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/interview" element={<InterviewPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/history/:sessionId" element={<HistoryDetailsPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

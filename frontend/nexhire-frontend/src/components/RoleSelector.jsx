@@ -1,226 +1,120 @@
+import { Brain, Briefcase, Code2, FileUp, Layout, Server } from "lucide-react";
 import { useState } from "react";
-import { useDispatch } from "react-redux";
-import { Code2, Brain, Briefcase } from "lucide-react";
-import { startInterview } from "../store/interviewSlice";
+import { useDispatch, useSelector } from "react-redux";
 
+import { getErrorMessage } from "../api/axiosClient";
 import { uploadResumeApi } from "../api/interviewApi";
+import { startInterview } from "../store/interviewSlice";
+import { ErrorNotice } from "./ui/States";
 
-const roles = [
-  {
-    name: "SDE",
-    description: "DSA, System Design, OOP",
-    icon: Code2,
-  },
-  {
-    name: "ML Engineer",
-    description: "ML Systems, Statistics",
-    icon: Brain,
-  },
-  {
-    name: "Product Manager",
-    description: "Product Sense, Metrics",
-    icon: Briefcase,
-  },
+const ROLES = [
+  { name: "SDE", description: "DSA, system design, OOP", icon: Code2 },
+  { name: "Backend Developer", description: "APIs, databases, scaling", icon: Server },
+  { name: "Frontend Developer", description: "React, performance, UX", icon: Layout },
+  { name: "ML Engineer", description: "ML systems, statistics", icon: Brain },
+  { name: "Product Manager", description: "Product sense, metrics", icon: Briefcase },
 ];
-
-const difficulties = [
-  "Easy",
-  "Medium",
-  "Hard",
-];
+const DIFFICULTIES = ["Easy", "Medium", "Hard"];
+const MAX_BYTES = 5 * 1024 * 1024;
 
 function RoleSelector() {
   const dispatch = useDispatch();
+  const { pending, error } = useSelector((state) => state.interview);
+  const [role, setRole] = useState("SDE");
+  const [difficulty, setDifficulty] = useState("Medium");
   const [resume, setResume] = useState(null);
-const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const isStarting = pending === "start";
 
-  const [role, setRole] =
-    useState("SDE");
-
-  const [difficulty, setDifficulty] =
-    useState("Medium");
-  
-  const handleResumeUpload = async (e) => {
-  const file = e.target.files?.[0];
-
-  if (!file) return;
-
-  try {
+  const handleResume = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadError(null);
+    setResume(null);
+    if (file.size > MAX_BYTES) {
+      setUploadError("Resume must be 5 MB or smaller.");
+      return;
+    }
     setUploading(true);
-
-    const formData = new FormData();
-
-    formData.append("file", file);
-
-    const data = await uploadResumeApi(formData);
-
-    setResume(data);
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setUploading(false);
-  }
-};  
-
-  const handleStart = () => {
-    dispatch(
-      startInterview({
-        role,
-        difficulty,
-        resume_id: resume?.resume_id,
-      })
-    );
+    try {
+      setResume(await uploadResumeApi(file));
+    } catch (err) {
+      setUploadError(getErrorMessage(err, "Could not read this resume."));
+    } finally {
+      setUploading(false);
+    }
   };
 
+  const start = () => dispatch(startInterview({ role, difficulty, resume_id: resume?.resume_id ?? null }));
+
   return (
-    <div className="bg-white
-    border border-slate-200/70
-    rounded-2xl
-    px-6 py-5
-    "
-    >
+    <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h2 className="text-xl font-semibold">
-          Start New Interview
-        </h2>
-
-        <p className="mt-1 text-slate-500">
-          Select role and difficulty
-        </p>
+        <h1 className="text-3xl">Set up your interview</h1>
+        <p className="mt-1 text-muted">Five questions. Weak answers get a follow-up.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 mb-5">
-        {roles.map((r) => {
-          const Icon = r.icon;
+      <section className="card space-y-6">
+        <fieldset>
+          <legend className="mb-2 text-sm font-semibold">Role</legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {ROLES.map(({ name, description, icon: Icon }) => (
+              <button key={name} type="button" onClick={() => setRole(name)} aria-pressed={role === name}
+                className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+                  role === name ? "border-accent bg-accent-soft" : "border-line hover:bg-paper"
+                }`}>
+                <Icon size={18} className="shrink-0 text-accent-dark" />
+                <span>
+                  <span className="block text-sm font-semibold">{name}</span>
+                  <span className="block text-xs text-muted">{description}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
 
-          return (
-            <button
-              key={r.name}
-              onClick={() =>
-                setRole(r.name)
-              }
-              className={`
-                  border border-slate-200
-                  rounded-2xl
-                  p-3.5 px-4
-                  text-left
-                  cursor-pointer
-                  transition-all
-                  ${
-                    role === r.name
-                      ? "border-indigo-600 bg-indigo-50"
-                      : "hover:border-indigo-400 hover:bg-indigo-50"
-                  }
-                  `}
-            >
-              <Icon className="mb-3 h-6 w-6 text-indigo-600" />
+        <fieldset>
+          <legend className="mb-2 text-sm font-semibold">Difficulty</legend>
+          <div className="grid grid-cols-3 gap-2">
+            {DIFFICULTIES.map((level) => (
+              <button key={level} type="button" onClick={() => setDifficulty(level)} aria-pressed={difficulty === level}
+                className={`rounded-lg border py-2 text-sm transition-colors ${
+                  difficulty === level ? "border-accent bg-accent-soft font-semibold text-accent-dark" : "border-line text-muted hover:bg-paper"
+                }`}>
+                {level}
+              </button>
+            ))}
+          </div>
+        </fieldset>
 
-              <h3 className="font-semibold">
-                {r.name}
-              </h3>
-
-              <p className="mt-1 text-sm text-slate-500">
-                {r.description}
+        <div>
+          <p className="mb-2 text-sm font-semibold">Resume <span className="font-normal text-muted">(optional)</span></p>
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line p-4 text-sm text-muted transition-colors focus-within:border-accent hover:bg-paper">
+            <FileUp size={18} className="shrink-0" />
+            <span>{uploading ? "Reading your resume..." : resume ? resume.filename : "Upload a text-based PDF, up to 5 MB"}</span>
+            <input type="file" accept="application/pdf,.pdf" onChange={handleResume} className="sr-only" />
+          </label>
+          {resume && (
+            <div className="mt-3">
+              <p className="text-sm text-muted">
+                Found {resume.skills.length} skills and {resume.projects.length} projects to ask about.
               </p>
-            </button>
-          );
-        })}
-      </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {resume.skills.map((skill) => (
+                  <span key={skill} className="rounded-md bg-accent-soft px-2 py-0.5 text-xs text-accent-dark">{skill}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {uploadError && <div className="mt-3"><ErrorNotice message={uploadError} /></div>}
+        </div>
 
-      <div className="flex gap-2 mb-5">
-        {difficulties.map((level) => (
-          <button
-            key={level}
-            onClick={() =>
-              setDifficulty(level)
-            }
-            className={`
-              flex-1 py-2
-              border border-slate-200
-              rounded-lg
-              text-[13px]
-              transition-all
-              ${
-                difficulty === level
-                  ? "border-indigo-600 bg-indigo-50 text-indigo-600 font-medium"
-                  : "text-slate-500"
-              }
-              `}
-          >
-            {level}
-          </button>
-        ))}
-      </div>
-      <div className="space-y-3 mt-5">
-  <label className="block font-medium text-slate-700">
-    Upload Resume (Optional)
-  </label>
-
-  <input
-    type="file"
-    accept=".pdf"
-    onChange={handleResumeUpload}
-    className="
-      block w-full
-      rounded-lg
-      border border-slate-300
-      p-2
-      text-sm
-    "
-  />
-
-  {uploading && (
-    <p className="text-sm text-slate-500">
-      Uploading resume...
-    </p>
-  )}
-  {resume && (
-  <div
-    className="
-      mt-4
-      rounded-xl
-      border border-green-200
-      bg-green-50
-      p-4
-    "
-  >
-    <h3 className="font-semibold text-green-700">
-      ✓ Resume Loaded
-    </h3>
-
-    <div className="mt-3 text-sm">
-      Skills Found: {resume.skills?.length || 0}
-    </div>
-
-    <div className="text-sm">
-      Projects Found: {resume.projects?.length || 0}
-    </div>
-
-    <div className="mt-3 flex flex-wrap gap-2">
-      {resume.skills?.map((skill) => (
-        <span
-          key={skill}
-          className="
-            rounded-md
-            bg-blue-100
-            px-2
-            py-1
-            text-xs
-          "
-        >
-          {skill}
-        </span>
-      ))}
-    </div>
-  </div>
-)}
-</div>
-      <button
-        onClick={handleStart}
-        className="rounded-xl bg-indigo-600 px-6 py-3 font-medium text-white hover:bg-indigo-700"
-      >
-        Start Interview
-      </button>
+        <ErrorNotice message={error} />
+        <button onClick={start} disabled={isStarting || uploading} className="btn-primary w-full py-3">
+          {isStarting ? "Preparing your first question..." : "Start interview"}
+        </button>
+      </section>
     </div>
   );
 }

@@ -1,176 +1,83 @@
+import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useState } from "react";
 
-import RoleSelector from "../components/RoleSelector";
-import QuestionCard from "../components/QuestionCard";
 import AnswerInput from "../components/AnswerInput";
 import FeedbackPanel from "../components/FeedbackPanel";
+import QuestionCard from "../components/QuestionCard";
+import RoleSelector from "../components/RoleSelector";
 import SessionSummary from "../components/SessionSummary";
-
-import {
-endInterview,
-loadNextQuestion,
-} from "../store/interviewSlice";
+import { ErrorNotice, Loading } from "../components/ui/States";
+import { endInterview, loadNextQuestion, restoreInterview } from "../store/interviewSlice";
 
 function InterviewPage() {
-const dispatch = useDispatch();
+  const dispatch = useDispatch();
+  const {
+    status, pending, error, sessionId, role, difficulty, maxQuestions,
+    currentQuestion, nextQuestion, lastFeedback, previousFeedback, result,
+  } = useSelector((state) => state.interview);
 
-const {
-currentQuestion,
-lastFeedback,
-nextQuestion,
-sessionId,
-sessionStatus,
-totalScore,
-summary,
-isLoading,
-} = useSelector((state) => state.interview);
+  // After a refresh Redux is empty, so ask the server for the interview in progress.
+  useEffect(() => {
+    if (status === "unknown") dispatch(restoreInterview());
+  }, [dispatch, status]);
 
-const [resume, setResume] = useState(null);
-const [uploading, setUploading] = useState(false);
+  const finish = () => dispatch(endInterview({ session_id: sessionId }));
+  const quit = () => {
+    if (window.confirm("End this interview now? Answered questions will still be scored.")) finish();
+  };
 
-const handleResumeUpload = async (e) => {
-  const file = e.target.files[0];
+  if (status === "unknown" || status === "restoring") return <Loading label="Checking for an interview in progress..." />;
+  if (status === "completed") return <SessionSummary result={result} role={role} difficulty={difficulty} />;
+  if (status === "idle") return <RoleSelector />;
 
-  if (!file) return;
-
-  const formData = new FormData();
-
-  formData.append("file", file);
-
-  try {
-    setUploading(true);
-
-    const data = await uploadResumeApi(formData);
-
-    setResume(data);
-
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setUploading(false);
-  }
-};
-
-// Completed Interview
-if (sessionStatus === "completed") {
-return (
-<SessionSummary
-totalScore={totalScore}
-strengths={summary?.strengths || []}
-improvements={summary?.improvements || []}
-/>
-);
-}
-
-return ( <div className="space-y-6">
-{/* Page Header */} <div className="mb-1"> <h1 className="text-2xl font-medium text-slate-900">
-Mock Interview </h1>
-
-
-    <p className="mt-1 text-sm text-slate-500">
-      Practice with AI-generated questions
-    </p>
-  </div>
-
-  {/* Loading State */}
-  {isLoading && (
-    <div
-      className="
-        bg-white
-        border border-slate-200/70
-        rounded-2xl
-        px-5 py-4
-      "
-    >
-      {/* <p className="text-[13px] text-slate-500">
-        AI is reviewing your answer...
-      </p> */}
-    </div>
-  )}
-
-  {/* Interview Setup */}
-  {!currentQuestion && <RoleSelector />}
-
-  {/* Active Interview */}
-  {currentQuestion && (
-    <div className="max-w-4xl">
-      {/* Progress Indicator */}
-      <div className="mb-5 flex items-center">
-        <div className="h-2 w-2 rounded-full bg-indigo-600 ring-4 ring-indigo-100" />
-
-        <div className="mx-2 h-px flex-1 bg-slate-200" />
-
-        <div className="h-2 w-2 rounded-full bg-slate-200" />
-
-        <div className="mx-2 h-px flex-1 bg-slate-200" />
-
-        <div className="h-2 w-2 rounded-full bg-slate-200" />
+  return (
+    <div className="mx-auto max-w-3xl space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="eyebrow">{role} · {difficulty}</p>
+          <p className="mt-1 text-sm text-muted">Question {currentQuestion.number} of {maxQuestions}</p>
+        </div>
+        <button onClick={quit} disabled={!!pending} className="btn-quiet">End interview</button>
       </div>
 
-      {/* Question */}
+      <div className="flex gap-1.5" role="progressbar" aria-valuemin={1} aria-valuemax={maxQuestions}
+        aria-valuenow={currentQuestion.number} aria-label="Interview progress">
+        {Array.from({ length: maxQuestions }, (_, i) => (
+          <span key={i} className={`h-1 flex-1 rounded-full ${i < currentQuestion.number ? "bg-accent" : "bg-line"}`} />
+        ))}
+      </div>
+
+      <ErrorNotice message={error} />
+
+      {previousFeedback && !lastFeedback && (
+        <details className="card py-4">
+          <summary className="cursor-pointer text-sm font-medium">
+            Feedback on your previous answer ({previousFeedback.score}/10)
+          </summary>
+          <div className="mt-4"><FeedbackPanel feedback={previousFeedback} bare /></div>
+        </details>
+      )}
+
       <QuestionCard question={currentQuestion} />
 
-      {/* Answer Box */}
-      {!lastFeedback && <AnswerInput />}
-
-      {/* Feedback + Actions */}
-      {lastFeedback && (
+      {lastFeedback ? (
         <>
           <FeedbackPanel feedback={lastFeedback} />
-
-          <div className="mt-4">
+          <div className="flex justify-end">
             {nextQuestion ? (
-              <button
-                onClick={() =>
-                  dispatch(loadNextQuestion())
-                }
-                className="
-                  inline-flex items-center gap-1.5
-                  px-4 py-2
-                  rounded-lg
-                  border border-indigo-600
-                  bg-indigo-600
-                  text-white
-                  text-[13px]
-                  hover:bg-indigo-700
-                  transition-colors
-                "
-              >
-                Next Question
-              </button>
+              <button onClick={() => dispatch(loadNextQuestion())} className="btn-primary">Next question</button>
             ) : (
-              <button
-                onClick={() =>
-                  dispatch(
-                    endInterview({
-                      session_id: sessionId,
-                    })
-                  )
-                }
-                className="
-                  inline-flex items-center gap-1.5
-                  px-4 py-2
-                  rounded-lg
-                  bg-emerald-500
-                  text-white
-                  text-[13px]
-                  hover:bg-emerald-600
-                  transition-colors
-                "
-              >
-                Finish Interview
+              <button onClick={finish} disabled={pending === "end"} className="btn-primary">
+                {pending === "end" ? "Preparing your report..." : "Finish and see report"}
               </button>
             )}
           </div>
         </>
+      ) : (
+        <AnswerInput key={currentQuestion.id} />
       )}
     </div>
-  )}
-</div>
-
-
-);
+  );
 }
 
 export default InterviewPage;

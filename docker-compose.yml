@@ -1,0 +1,58 @@
+# Self-contained local stack. DATABASE_URL is set here on purpose,
+# so `docker compose up` can never connect to a hosted database from your .env.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nexhire
+      POSTGRES_USER: nexhire
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexhire_local}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexhire -d nexhire"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Runs once and exits, so replicas never race to apply the same migration.
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    environment: &backend-env
+      DATABASE_URL: postgresql+psycopg2://nexhire:${POSTGRES_PASSWORD:-nexhire_local}@db:5432/nexhire
+      DIRECT_URL: postgresql+psycopg2://nexhire:${POSTGRES_PASSWORD:-nexhire_local}@db:5432/nexhire
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (32+ characters)}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      CORS_ORIGINS: http://localhost:8080
+      # Safe only because the backend port is not published: nginx is its sole client.
+      FORWARDED_ALLOW_IPS: "*"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    environment: *backend-env
+    expose:
+      - "8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend/nexhire-frontend
+      args:
+        VITE_API_URL: /api
+    ports:
+      - "8080:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

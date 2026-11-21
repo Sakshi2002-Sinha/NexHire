@@ -1,19 +1,12 @@
-import { Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { Navigate, useLocation } from "react-router-dom";
 
 function ProtectedRoute({ children }) {
-  const reduxToken = useSelector(
-    (state) => state.auth.token
-  );
+  const token = useSelector((state) => state.auth.token);
+  const location = useLocation();
 
-  const token =
-    reduxToken ||
-    localStorage.getItem("token");
-
-  if (!token) {
-    return <Navigate to="/login" />;
-  }
-
+  if (!token) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return children;
 }
+
 export default ProtectedRoute;

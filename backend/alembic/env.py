@@ -5,20 +5,21 @@ from sqlalchemy import pool
 
 from alembic import context
 from app.database import Base
-from app.models import User
+from app import models  # noqa: F401  (registers every table for autogenerate)
 
 
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-from dotenv import load_dotenv
 import os
 
-load_dotenv()
+from app.config import normalize_database_url, settings
 
-database_url = os.getenv("DATABASE_URL")
-config.set_main_option("sqlalchemy.url", database_url)
+# Migrations need a direct connection; transaction poolers break DDL sessions.
+database_url = normalize_database_url(os.getenv("DIRECT_URL") or settings.database_url)
+# ConfigParser treats % as interpolation, and URL-encoded passwords contain it.
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

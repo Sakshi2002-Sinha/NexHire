@@ -1,125 +1,75 @@
-import fastapi 
-from fastapi import FastAPI,Depends,HTTPException
+import logging
+import time
+import uuid
+
+from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from sqlalchemy.orm import Session
-from app.routes.auth import router as auth_router
+
+from app.config import settings
 from app.dependencies import get_db
-from app.schemas import UserCreate, UserResponse, UserLogin, Token
-from app.models import User
-from app.auth import get_current_user, hash_password, verify_password, create_access_token
-from fastapi.security import OAuth2PasswordRequestForm
-from app.routes.interview import router as interview_router
-from app.routes.history import router as history_router
+from app.routes.auth import router as auth_router
 from app.routes.dashboard import router as dashboard_router
-from fastapi.middleware.cors import CORSMiddleware
-
-from fastapi import APIRouter, Depends, UploadFile, File
+from app.routes.history import router as history_router
 from app.routes.interview import router as interview_router
-from fastapi.middleware.cors import CORSMiddleware
-from app import models
-from app.database import engine
-import os
 
-print("DATABASE_URL =", os.getenv("DATABASE_URL"))
-app=FastAPI()
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger("nexhire.api")
 
-print(models.Base.metadata.tables.keys())
-models.Base.metadata.create_all(bind=engine)
+# The schema is owned by Alembic migrations; the app never creates tables at startup.
+app = FastAPI(title="NexHire API", version="1.0.0")
+
+
+@app.middleware("http")
+async def request_context(request: Request, call_next):
+    request_id = uuid.uuid4().hex[:12]
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception("unhandled_error id=%s path=%s", request_id, request.url.path)
+        response = JSONResponse({"detail": "Internal server error", "request_id": request_id}, status_code=500)
+    response.headers["X-Request-ID"] = request_id
+    logger.info(
+        "request id=%s method=%s path=%s status=%d ms=%d",
+        request_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        (time.perf_counter() - started) * 1000,
+    )
+    return response
+
+
+# Added last so it is outermost: even error responses carry CORS headers.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://nexhire-kappa.vercel.app",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=list(settings.cors_origins),
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+    expose_headers=["X-Request-ID", "Retry-After"],
 )
 
 app.include_router(auth_router)
-
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
-
-
-@app.post("/register", response_model=UserResponse)
-def register(
-    user: UserCreate,
-    db: Session = Depends(get_db)
-):
-    # Check if email already exists
-    existing_user = db.query(User).filter(
-        User.email == user.email
-    ).first()
-
-    if existing_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Email already registered"
-        )
-
-    # Hash password
-    hashed_pw = hash_password(user.password)
-
-    # Create new user
-    new_user = User(
-        email=user.email,
-        name=user.name,
-        hashed_password=hashed_pw
-    )
-
-    # Save to database
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    return new_user
-
-
-
-@app.post("/login", response_model=Token)
-def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
-    db_user = db.query(User).filter(
-        User.email == form_data.username
-    ).first()
-
-    if not db_user:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid email or password"
-        )
-
-    if not verify_password(
-        form_data.password,
-        db_user.hashed_password
-    ):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid email or password"
-        )
-
-    access_token = create_access_token(
-        {"sub": db_user.email}
-    )
-
-    return {
-        "access_token": access_token,
-        "token_type": "bearer"
-    }
-@app.get("/me")
-def read_me(
-    current_user: User = Depends(get_current_user)
-):
-    return {
-        "id": current_user.id,
-        "email": current_user.email,
-        "name": current_user.name
-    }
-    
-app.include_router(interview_router)    
+app.include_router(interview_router)
 app.include_router(history_router)
 app.include_router(dashboard_router)
+
+
+@app.get("/health", tags=["Ops"])
+def health():
+    """Liveness: the process is up. Deliberately does not touch the database."""
+    return {"status": "ok"}
+
+
+@app.get("/ready", tags=["Ops"])
+def ready(db: Session = Depends(get_db)):
+    """Readiness: the instance can reach its database."""
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        logger.exception("readiness_failed")
+        return JSONResponse({"status": "unavailable"}, status_code=503)
+    return {"status": "ready"}
