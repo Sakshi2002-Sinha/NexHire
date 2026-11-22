@@ -1,6 +1,7 @@
 # Python
 venv/
 .venv/
+.demo-db/
 __pycache__/
 *.pyc
 

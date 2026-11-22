@@ -117,7 +117,11 @@ users 1──* interview_sessions 1──* questions 1──1 answers
 | Only last 3 turns sent | Lower cost and latency | Model forgets older detail |
 | Max one follow-up in a row | Avoids trapping a candidate on one topic | Less depth on a weak area |
 | Low temperature (0.2) for scoring, higher (0.8) for questions | Consistent grading, varied questions | Scores still aren't perfectly repeatable |
-| Skills and titles only sent to AI | Raw resumes hold phone numbers and addresses | Less context for questions |
+| Question prompts use skills and titles only | Keeps each interview prompt small and private | Less context for questions |
+| Resume tree sends redacted text once at upload | Needs project detail, so email, phone, links, and the name header are removed first | Regex redaction can miss unusual formats, such as an address |
+| Tree stored as JSONB and reused | Viewing costs no AI call and loads instantly | Must re-analyze to pick up a better prompt |
+| Basic tree when AI fails | Upload still succeeds using local parsing | Less detail until "Build detailed tree with AI" is used |
+| `d3-hierarchy` plus custom rendering | Small dependency that handles only layout | Pan and zoom aren't included |
 
 ### Security
 
@@ -216,7 +220,7 @@ These make excellent interview stories.
 
 ## 7. How it was verified
 
-- 24 backend tests on both SQLite and real PostgreSQL
+- 50 backend tests on both SQLite and real PostgreSQL
 - Migration tested on legacy-shaped data, including rollback, with no model drift
 - Concurrency test: 6 simultaneous starts and 6 simultaneous submits
 - Full browser run in Edge: register, interview, refresh at each stage, report, dashboard, history, mobile, logout
@@ -315,6 +319,12 @@ Only loosely. It measures how direct the wording is, so it's the lowest-weighted
 
 **Q: How would you reduce AI cost?**
 Limit context, cache generated first questions, use a cheaper model for simple tasks, and enforce per-user quotas.
+
+**Q: How does the resume tree work?**
+The PDF's text is extracted and contact details are redacted. Gemini returns schema-validated JSON for projects, experience, skills, and education. I bound and deduplicate that output, store it in a JSONB column, and convert it into a node tree on read. If the AI fails, a local parser still produces a basic tree.
+
+**Q: Why store JSON instead of normalized resume tables?**
+The profile is read as one document and its shape may evolve. I don't query across individual resume items yet. If I needed "all users with skill X", I'd normalize skills or add a GIN index.
 
 **Q: Why not RAG?**
 Questions don't currently need a private knowledge base. RAG would make sense for company-specific question banks or grounding feedback in reference answers.
@@ -448,15 +458,37 @@ Every claim below is true of the code today. Add real usage numbers only once yo
 > - Built a full-stack interview platform with adaptive multi-turn follow-ups, resume-aware questions, and scoring across four competencies, with refresh-safe sessions restored from server state.
 > - Engineered fault-tolerant LLM integration with schema-validated output, bounded retries, curated fallbacks, and server-side score normalization, preventing failed evaluations from corrupting user analytics.
 > - Eliminated race conditions using PostgreSQL partial unique indexes and idempotent APIs, verified with concurrent request tests; closed IDOR vulnerabilities through user-scoped data access.
-> - Shipped with Alembic migrations, 24 automated tests, Docker Compose, and a GitHub Actions pipeline covering linting, tests, migration checks, and image builds.
+> - Shipped with Alembic migrations, 50 automated tests, Docker Compose, and a GitHub Actions pipeline covering linting, tests, migration checks, and image builds.
 
 ---
 
-## 12. Known limitations
+## 12. Resume Defense, Speech Coach, and evaluation
+
+**Resume Defense.** Selecting a project, role, technology, or skill starts a three-question interview on that item. The client sends only a node ID. The server resolves it against the user's stored resume, so a client can't inject its own "claim". The session stores a snapshot of the claim, and the latest score marks the node Verified (7+), Developing (5+), or Weak.
+
+**Speech Coach.** The browser's Web Speech API transcribes the answer. The client reports talk time and pauses, and the server calculates words per minute and filler words from the text. No extra AI call is used. Browsers often clean up "um" and "uh" in transcripts, so filler counts are a lower bound.
+
+**Spoken interviewer.** Questions are read aloud with the browser's free speech synthesis.
+
+**AI scoring benchmark.** `backend/evals` holds labeled strong, average, and weak answers. `python -m evals.run_eval` checks that scores rank them correctly and measures how much scores vary across repeat runs. Don't quote a benchmark number until you've run it and recorded the result.
+
+**Q: How do you prevent a user from defending something not on their resume?**
+The API accepts a node ID rather than free text, and looks it up in that user's stored profile. Unknown IDs and other users' resumes return 404.
+
+**Q: Why are metrics calculated on the server?**
+It keeps one definition of words per minute and fillers, makes the logic testable, and means the client only supplies what the server can't know: timing.
+
+**Q: What limits the app in production today?**
+AI quota. I found that one free Gemini model allowed only 20 requests per day, while an interview used 11. I cut that to 6 by having one request score the answer and draft both possible next questions, then choosing between them on the server from the score. The final report is now built from stored scores with no AI call. Each user is limited to 3 interviews per day, and once the daily provider quota is hit the app fails fast with a clear message.
+
+---
+
+## 13. Known limitations
 
 Saying these before you're asked shows senior judgment.
 
 - AI scores haven't been validated against human interviewers.
+- The free AI quota supports only a few interviews per day.
 - The rate limiter works per process, so the backend runs one worker.
 - JWTs can't be revoked before they expire.
 - The token is in `localStorage`.

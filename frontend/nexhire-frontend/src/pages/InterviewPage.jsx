@@ -12,7 +12,7 @@ import { endInterview, loadNextQuestion, restoreInterview } from "../store/inter
 function InterviewPage() {
   const dispatch = useDispatch();
   const {
-    status, pending, error, sessionId, role, difficulty, maxQuestions,
+    status, pending, error, sessionId, role, difficulty, focusLabel, maxQuestions,
     currentQuestion, nextQuestion, lastFeedback, previousFeedback, result,
   } = useSelector((state) => state.interview);
 
@@ -20,6 +20,12 @@ function InterviewPage() {
   useEffect(() => {
     if (status === "unknown") dispatch(restoreInterview());
   }, [dispatch, status]);
+
+  // Each new question and the final report should start at the top of the page.
+  useEffect(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+  }, [currentQuestion?.id, status]);
 
   const finish = () => dispatch(endInterview({ session_id: sessionId }));
   const quit = () => {
@@ -34,7 +40,9 @@ function InterviewPage() {
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="eyebrow">{role} · {difficulty}</p>
+          <p className="eyebrow">
+            {focusLabel ? `Resume Defense · ${focusLabel}` : `${role} · ${difficulty}`}
+          </p>
           <p className="mt-1 text-sm text-muted">Question {currentQuestion.number} of {maxQuestions}</p>
         </div>
         <button onClick={quit} disabled={!!pending} className="btn-quiet">End interview</button>
@@ -43,7 +51,7 @@ function InterviewPage() {
       <div className="flex gap-1.5" role="progressbar" aria-valuemin={1} aria-valuemax={maxQuestions}
         aria-valuenow={currentQuestion.number} aria-label="Interview progress">
         {Array.from({ length: maxQuestions }, (_, i) => (
-          <span key={i} className={`h-1 flex-1 rounded-full ${i < currentQuestion.number ? "bg-accent" : "bg-line"}`} />
+          <span key={i} className={`h-1 flex-1 rounded-full transition-colors duration-500 ${i < currentQuestion.number ? "bg-accent" : "bg-line"}`} />
         ))}
       </div>
 

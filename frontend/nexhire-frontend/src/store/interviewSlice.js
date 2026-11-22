@@ -59,6 +59,7 @@ const initialState = {
   sessionId: null,
   role: null,
   difficulty: null,
+  focusLabel: null,
   maxQuestions: 5,
   currentQuestion: null,
   nextQuestion: null,
@@ -106,6 +107,7 @@ const interviewSlice = createSlice({
         state.sessionId = payload.session_id;
         state.role = payload.role;
         state.difficulty = payload.difficulty;
+        state.focusLabel = payload.focus_label;
         state.maxQuestions = payload.max_questions;
         state.currentQuestion = payload.current_question;
         state.lastFeedback = payload.current_feedback;
@@ -123,8 +125,13 @@ const interviewSlice = createSlice({
         state.sessionId = payload.session_id;
         state.role = payload.role;
         state.difficulty = payload.difficulty;
+        state.focusLabel = payload.focus_label;
         state.maxQuestions = payload.max_questions;
         state.currentQuestion = payload.question;
+        state.nextQuestion = null;
+        state.lastFeedback = null;
+        state.previousFeedback = null;
+        state.result = null;
       })
       .addCase(startInterview.rejected, rejected)
       .addCase(submitAnswer.pending, pendingAs("answer"))

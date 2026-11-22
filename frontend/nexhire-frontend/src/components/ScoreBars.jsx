@@ -19,7 +19,7 @@ function ScoreBars({ scores }) {
               <dd className="font-semibold tabular-nums">{formatScore(value)}/10</dd>
             </div>
             <div className="h-1.5 rounded-full bg-line/60" aria-hidden="true">
-              <div className="h-full rounded-full bg-accent" style={{ width: `${(value ?? 0) * 10}%` }} />
+              <div className="bar-fill h-full rounded-full bg-accent" style={{ width: `${(value ?? 0) * 10}%` }} />
             </div>
           </div>
         );

@@ -46,6 +46,7 @@ class InterviewStartRequest(BaseModel):
     role: Role
     difficulty: Difficulty
     resume_id: str | None = None
+    focus_node_id: str | None = Field(default=None, max_length=80)
 
 
 class QuestionOut(BaseModel):
@@ -58,13 +59,30 @@ class QuestionOut(BaseModel):
 class InterviewStartResponse(BaseModel):
     session_id: str
     max_questions: int
+    focus_label: str | None = None
     question: QuestionOut
+
+
+class SpeechInput(BaseModel):
+    duration_seconds: float = Field(gt=0, le=1800)
+    long_pauses: int = Field(default=0, ge=0, le=500)
 
 
 class AnswerRequest(BaseModel):
     session_id: str
     question_id: str
     answer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=8000)]
+    speech: SpeechInput | None = None
+
+
+class SpeechMetrics(BaseModel):
+    words: int
+    words_per_minute: int
+    filler_words: int
+    filler_breakdown: dict[str, int]
+    long_pauses: int
+    duration_seconds: int
+    pace: Literal["slow", "good", "fast"]
 
 
 class FeedbackOut(BaseModel):
@@ -76,6 +94,7 @@ class FeedbackOut(BaseModel):
     feedback: str
     strengths: list[str]
     improvements: list[str]
+    speech: SpeechMetrics | None = None
 
 
 class AnswerResponse(BaseModel):
@@ -88,6 +107,7 @@ class ActiveSessionResponse(BaseModel):
     role: str
     difficulty: str
     max_questions: int
+    focus_label: str | None = None
     current_question: QuestionOut
     # Set when the current question is already answered and only "finish" remains.
     current_feedback: FeedbackOut | None
@@ -129,6 +149,7 @@ class QuestionAnswerDetail(BaseModel):
     feedback: str | None = None
     strengths: list[str] = []
     improvements: list[str] = []
+    speech: SpeechMetrics | None = None
 
 
 class InterviewDetailResponse(BaseModel):
@@ -139,6 +160,7 @@ class InterviewDetailResponse(BaseModel):
     score: float | None = None
     competencies: CompetencyScores
     summary: str | None = None
+    focus_label: str | None = None
     created_at: UTCDateTime
     questions: list[QuestionAnswerDetail]
 
@@ -179,3 +201,40 @@ class ResumeUploadResponse(BaseModel):
     filename: str
     skills: list[str]
     projects: list[str]
+
+
+class ResumeListItem(BaseModel):
+    resume_id: str
+    filename: str
+    uploaded_at: UTCDateTime
+
+
+class ResumeListResponse(BaseModel):
+    resumes: list[ResumeListItem]
+
+
+class TreeNode(BaseModel):
+    id: str
+    label: str
+    kind: str
+    summary: str = ""
+    claims: list[str] = []
+    can_defend: bool = False
+    status: Literal["untested", "weak", "developing", "verified"] | None = None
+    score: float | None = None
+    children: list["TreeNode"] = []
+
+
+class ResumeTreeStats(BaseModel):
+    projects: int
+    experience: int
+    skills: int
+
+
+class ResumeTreeResponse(BaseModel):
+    resume_id: str
+    filename: str
+    uploaded_at: UTCDateTime
+    source: Literal["ai", "basic"]
+    stats: ResumeTreeStats
+    tree: TreeNode

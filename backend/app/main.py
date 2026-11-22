@@ -14,6 +14,7 @@ from app.routes.auth import router as auth_router
 from app.routes.dashboard import router as dashboard_router
 from app.routes.history import router as history_router
 from app.routes.interview import router as interview_router
+from app.routes.resume import router as resume_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("nexhire.api")
@@ -54,6 +55,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(interview_router)
+app.include_router(resume_router)
 app.include_router(history_router)
 app.include_router(dashboard_router)
 

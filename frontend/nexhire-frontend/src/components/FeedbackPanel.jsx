@@ -4,11 +4,12 @@ import ReactMarkdown from "react-markdown";
 import PointList from "./PointList";
 import ScoreBars from "./ScoreBars";
 import { scoreLabel } from "./scoreFormat";
+import SpeechCoach from "./SpeechCoach";
 
 function FeedbackPanel({ feedback, bare = false }) {
   if (!feedback) return null;
   return (
-    <section className={bare ? "" : "card"} aria-label="Answer feedback">
+    <section className={bare ? "" : "card enter"} aria-label="Answer feedback">
       <div className="grid gap-6 md:grid-cols-[150px_1fr]">
         <div>
           <p className="eyebrow">Score</p>
@@ -27,6 +28,7 @@ function FeedbackPanel({ feedback, bare = false }) {
         <PointList title="What worked" items={feedback.strengths} icon={Check} iconClass="text-accent" />
         <PointList title="What to improve" items={feedback.improvements} icon={TrendingUp} iconClass="text-warn" />
       </div>
+      <SpeechCoach speech={feedback.speech} />
     </section>
   );
 }

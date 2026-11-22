@@ -8,6 +8,7 @@ import { getInterviewDetails } from "../api/historyApi";
 import PointList from "../components/PointList";
 import ScoreBars from "../components/ScoreBars";
 import { formatScore, scoreLabel } from "../components/scoreFormat";
+import SpeechCoach from "../components/SpeechCoach";
 import { ErrorNotice, Loading } from "../components/ui/States";
 
 function HistoryDetailsPage() {
@@ -40,7 +41,7 @@ function HistoryDetailsPage() {
         <p className="eyebrow">
           {session.role} · {session.difficulty} · {new Date(session.created_at).toLocaleDateString()}
         </p>
-        <h1 className="mt-1 text-3xl">Interview review</h1>
+        <h1 className="mt-1 text-3xl">{session.focus_label ? `Resume Defense: ${session.focus_label}` : "Interview review"}</h1>
       </div>
 
       <section className="card">
@@ -84,6 +85,7 @@ function HistoryDetailsPage() {
                 <PointList title="What worked" items={q.strengths} icon={Check} iconClass="text-accent" />
                 <PointList title="What to improve" items={q.improvements} icon={TrendingUp} iconClass="text-warn" />
               </div>
+              <SpeechCoach speech={q.speech} />
             </>
           ) : (
             <p className="mt-3 text-sm text-muted">Not answered.</p>

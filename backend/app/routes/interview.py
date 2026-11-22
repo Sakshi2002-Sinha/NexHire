@@ -19,6 +19,7 @@ from app.schemas import (
 )
 from app.services import interview_service as service
 from app.services.resume_parser import extract_projects, extract_skills
+from app.services.resume_profile import build_profile
 from app.services.resume_services import InvalidResume, extract_text_from_pdf
 
 router = APIRouter(prefix="/interview", tags=["Interview"])
@@ -26,12 +27,12 @@ router = APIRouter(prefix="/interview", tags=["Interview"])
 
 @router.post("/start", response_model=InterviewStartResponse, status_code=status.HTTP_201_CREATED)
 def start_interview(data: InterviewStartRequest, db: Session = Depends(get_db), user: User = Depends(limit_ai_calls)):
-    return service.start_session(db, user, data.role, data.difficulty, data.resume_id)
+    return service.start_session(db, user, data.role, data.difficulty, data.resume_id, data.focus_node_id)
 
 
 @router.post("/answer", response_model=AnswerResponse)
 def answer_question(data: AnswerRequest, db: Session = Depends(get_db), user: User = Depends(limit_ai_calls)):
-    return service.submit_answer(db, user, data.session_id, data.question_id, data.answer)
+    return service.submit_answer(db, user, data.session_id, data.question_id, data.answer, data.speech)
 
 
 @router.post("/end", response_model=InterviewEndResponse)
@@ -50,8 +51,10 @@ def active_interview(db: Session = Depends(get_db), user: User = Depends(get_cur
 def upload_resume(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(limit_ai_calls),
 ):
+    user_id = user.id
+    db.rollback()  # Release the connection: parsing and the AI call below can take seconds.
     content = file.file.read(settings.max_resume_bytes + 1)
     if len(content) > settings.max_resume_bytes:
         raise HTTPException(413, detail="Resume must be 5 MB or smaller")
@@ -65,7 +68,10 @@ def upload_resume(
         raise HTTPException(422, detail=str(exc)) from None
     skills, projects = extract_skills(text), extract_projects(text)
     filename = (file.filename or "resume.pdf").replace("\\", "/").rsplit("/", 1)[-1][:255]
-    resume = Resume(user_id=user.id, filename=filename, extracted_text=text, skills=skills, projects=projects)
+    profile = build_profile(text, skills, projects)
+    resume = Resume(
+        user_id=user_id, filename=filename, extracted_text=text, skills=skills, projects=projects, profile=profile
+    )
     db.add(resume)
     db.commit()
     return ResumeUploadResponse(resume_id=resume.id, filename=filename, skills=skills, projects=projects)

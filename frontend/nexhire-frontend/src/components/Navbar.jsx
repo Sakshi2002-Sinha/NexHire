@@ -1,4 +1,4 @@
-import { History, LayoutDashboard, LogOut, MessagesSquare } from "lucide-react";
+import { History, LayoutDashboard, LogOut, MessagesSquare, Network } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { NavLink, useNavigate } from "react-router-dom";
 
@@ -8,6 +8,7 @@ import Logo from "./ui/Logo";
 const LINKS = [
   ["/dashboard", "Dashboard", LayoutDashboard],
   ["/interview", "Interview", MessagesSquare],
+  ["/resume", "Resume", Network],
   ["/history", "History", History],
 ];
 

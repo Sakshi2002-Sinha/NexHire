@@ -37,7 +37,7 @@ def test_full_interview_computes_competency_averages(client, auth, fake_llm):
     assert end.status_code == 200 and body["status"] == "completed"
     assert body["total_score"] == 8
     assert body["competencies"]["technical_depth"] == 8
-    assert body["summary"] == "Solid session."
+    assert body["summary"].startswith("You answered 5 question(s) with an average score of 8.0/10.")
     assert body["strengths"] == ["Clear, structured reasoning"], "commas must not split items"
     detail = client.get(f"/history/{sid}", headers=auth).json()
     assert len(detail["questions"]) == 5 and detail["created_at"].endswith("Z")

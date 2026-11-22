@@ -1,0 +1,26 @@
+[
+  {
+    "role": "SDE",
+    "difficulty": "Medium",
+    "question": "How does a database index speed up reads, and when does it hurt performance?",
+    "strong": "Most relational databases use a B-tree index, so a lookup is O(log n) instead of a full table scan. The tree keeps keys sorted, which also helps range queries and ORDER BY. The cost is extra storage and slower writes, because every insert, update, and delete must maintain each index. Indexes are less useful on low-selectivity columns, and a composite index only helps queries that use its leftmost columns. I would confirm the benefit with EXPLAIN ANALYZE on real query patterns before adding one.",
+    "average": "An index is like the index of a book. The database can find rows faster without reading the whole table. It uses more space and can make inserts slower, so you should not add indexes everywhere.",
+    "weak": "An index makes the database faster. You should add it to tables so queries run quickly."
+  },
+  {
+    "role": "Backend Developer",
+    "difficulty": "Medium",
+    "question": "How would you make a payment endpoint idempotent?",
+    "strong": "The client sends a unique idempotency key with each payment attempt. In one transaction, I insert that key with a unique constraint and a request hash, then create the payment. A retry with the same key returns the stored response, and the same key with a different body returns a conflict. A concurrent duplicate fails on the constraint, so only one charge is created. I would pass the key to the payment provider too, expire old keys after a retention period, and reconcile with provider webhooks for timeouts where the outcome is unknown.",
+    "average": "I would have the client send a unique request ID and save it in the database. If the same ID comes again, I return the old result instead of charging the customer again.",
+    "weak": "I would disable the pay button after a click so the user cannot pay twice."
+  },
+  {
+    "role": "ML Engineer",
+    "difficulty": "Medium",
+    "question": "What is data leakage? Give an example and explain how to prevent it.",
+    "strong": "Data leakage is when training uses information that would not be available at prediction time, so validation looks better than production. A common example is fitting a scaler on the full dataset before splitting, or using a feature like refund_issued to predict fraud because it is recorded after the event. I prevent it by splitting first, fitting preprocessing inside a pipeline on training folds only, using time-based splits for temporal data, grouping related entities across folds, and auditing suspiciously predictive features for when each value becomes available.",
+    "average": "Data leakage happens when information from the test set gets into training. For example, normalizing all data before splitting. You can prevent it by splitting the data first.",
+    "weak": "Data leakage is when your data gets leaked or stolen. You prevent it with encryption."
+  }
+]

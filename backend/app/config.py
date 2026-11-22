@@ -40,6 +40,7 @@ class Settings:
     gemini_rpm: int
     ai_user_rpm: int
     login_rpm: int
+    daily_interviews: int
     max_resume_bytes: int
 
 
@@ -52,13 +53,14 @@ def load_settings() -> Settings:
         database_url=normalize_database_url(_required("DATABASE_URL")),
         secret_key=secret,
         gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
-        gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        gemini_model=os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite"),
         cors_origins=tuple(o.strip() for o in origins.split(",") if o.strip()),
         access_token_minutes=int(os.getenv("ACCESS_TOKEN_MINUTES", "60")),
         max_questions=int(os.getenv("MAX_QUESTIONS", "5")),
         gemini_rpm=int(os.getenv("GEMINI_RPM", "15")),
         ai_user_rpm=int(os.getenv("AI_USER_RPM", "10")),
         login_rpm=int(os.getenv("LOGIN_RPM", "10")),
+        daily_interviews=int(os.getenv("DAILY_INTERVIEWS", "3")),
         max_resume_bytes=int(os.getenv("MAX_RESUME_BYTES", str(5 * 1024 * 1024))),
     )
 

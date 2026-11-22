@@ -52,6 +52,8 @@ class Resume(Base):
     extracted_text = Column(Text)
     skills = Column(JSON, nullable=True)
     projects = Column(JSON, nullable=True)
+    # Structured resume, extracted once at upload so viewing the tree costs no AI call.
+    profile = Column(JsonList, nullable=True)
     uploaded_at = Column(DateTime, default=utcnow)
 
 
@@ -80,6 +82,8 @@ class InterviewSession(Base):
     problem_solving_avg = Column(Float, nullable=True)
     confidence_avg = Column(Float, nullable=True)
     summary = Column(Text, nullable=True)
+    # Resume Defense: a snapshot of the claim under review, so later resume edits can't change history.
+    focus = Column(JsonList, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
     resume_id = Column(String, ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True)
@@ -132,6 +136,7 @@ class Answer(Base):
     strengths = Column(JsonList, nullable=True)
     improvements = Column(JsonList, nullable=True)
     weak_topics = Column(JsonList, nullable=True)
+    speech = Column(JsonList, nullable=True)
     created_at = Column(DateTime, default=utcnow)
 
     question = relationship("Question", back_populates="answer")

@@ -45,6 +45,21 @@ QUESTION_BANK = {
 }
 
 
+_DEFENSE = [
+    "Walk me through {label}. What was your specific contribution?",
+    "What was the hardest technical decision in {label}, and what alternatives did you reject?",
+    "If {label} had to handle ten times the load, what would break first?",
+]
+
+
+def fallback_defense_question(label: str, asked: list[str]) -> str:
+    for template in _DEFENSE:
+        question = template.format(label=label)
+        if question not in asked:
+            return question
+    return f"What would you change about {label} if you started again?"
+
+
 def fallback_question(role: str, asked: list[str]) -> str:
     """Return the first curated question not yet asked in this session."""
     seen = set(asked)

@@ -24,15 +24,18 @@ class FakeLLM:
         self.score = 8
         self.calls = []
         self.count = 0
+        self.drafted = {}
+        self.next_contexts = []
 
-    def question(self, role, difficulty, asked=None, recent=None, follow_up=None, resume=None):
-        self.calls.append({"asked": asked, "recent": recent, "follow_up": follow_up, "resume": resume})
+    def question(self, role, difficulty, asked=None, recent=None, follow_up=None, resume=None, focus=None):
+        self.calls.append({"asked": asked, "recent": recent, "follow_up": follow_up, "resume": resume, "focus": focus})
         if self.fail_questions:
             raise llm.LLMUnavailable("down")
         self.count += 1
         return f"Generated question {self.count}"
 
-    def evaluate(self, question, answer, role, difficulty="Medium"):
+    def evaluate(self, question, answer, role, difficulty="Medium", next_context=None):
+        self.next_contexts.append(next_context)
         if self.fail_evaluation:
             raise llm.LLMUnavailable("down")
         s = self.score
@@ -46,10 +49,8 @@ class FakeLLM:
             "strengths": ["Clear, structured reasoning"],
             "improvements": ["Discuss trade-offs"],
             "weak_topics": ["caching"],
+            "next_questions": self.drafted,
         }
-
-    def summary(self, role, pairs):
-        return "Solid session."
 
 
 @pytest.fixture(autouse=True)
@@ -59,6 +60,7 @@ def clean_state():
     ai_limiter.reset()
     login_limiter.reset()
     llm.gemini_budget.reset()
+    llm._quota_blocked_until = 0.0
     yield
 
 
@@ -67,7 +69,6 @@ def fake_llm(monkeypatch):
     fake = FakeLLM()
     monkeypatch.setattr(llm, "generate_question", fake.question)
     monkeypatch.setattr(llm, "evaluate_answer", fake.evaluate)
-    monkeypatch.setattr(llm, "generate_session_summary", fake.summary)
     return fake
 
 

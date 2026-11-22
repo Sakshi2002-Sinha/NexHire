@@ -15,6 +15,7 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const InterviewPage = lazy(() => import("./pages/InterviewPage"));
 const HistoryPage = lazy(() => import("./pages/HistoryPage"));
 const HistoryDetailsPage = lazy(() => import("./pages/HistoryDetailsPage"));
+const ResumePage = lazy(() => import("./pages/ResumePage"));
 
 function App() {
   const dispatch = useDispatch();
@@ -42,6 +43,7 @@ function App() {
           >
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/interview" element={<InterviewPage />} />
+            <Route path="/resume" element={<ResumePage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/history/:sessionId" element={<HistoryDetailsPage />} />
           </Route>

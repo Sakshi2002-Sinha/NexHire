@@ -24,7 +24,7 @@ services:
       DIRECT_URL: postgresql+psycopg2://nexhire:${POSTGRES_PASSWORD:-nexhire_local}@db:5432/nexhire
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (32+ characters)}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
       CORS_ORIGINS: http://localhost:8080
       # Safe only because the backend port is not published: nginx is its sole client.
       FORWARDED_ALLOW_IPS: "*"
