@@ -1,6 +1,10 @@
 # NexHire
 
-AI mock interview platform that asks adaptive follow-up questions, scores answers across four skills, and tracks progress over time.
+AI mock interview platform that turns your resume into a skill tree, questions you on your own claims, scores answers across four skills, and tracks progress over time.
+
+**[Try the live app](https://nexhire-app-six.vercel.app)** · [Architecture](docs/ARCHITECTURE.md) · [Deployment guide](docs/DEPLOYMENT.md)
+
+> The free API server sleeps when idle, so the first request can take up to a minute.
 
 **Stack:** React 19, Redux Toolkit, Tailwind CSS, FastAPI, SQLAlchemy, Alembic, PostgreSQL, Gemini, Docker, GitHub Actions
 
@@ -27,15 +31,15 @@ Screenshots use a fictional demo account.
 
 ## Architecture
 
-```text
-Browser (React + Redux)
-        │  HTTPS, JWT bearer token
-        ▼
-FastAPI ── routes → services ──► Gemini API
-        │                        (validated JSON, retry, fallback)
-        ▼
-PostgreSQL (users → sessions → questions → answers)
+```mermaid
+flowchart LR
+    U[Browser] --> FE["React SPA<br/>Vercel"]
+    FE -- "HTTPS + JWT" --> API["FastAPI<br/>Render"]
+    API --> DB[("PostgreSQL<br/>Supabase")]
+    API -- "Validated JSON" --> AI["Google Gemini"]
 ```
+
+See the [architecture guide](docs/ARCHITECTURE.md) for the data model, API, and request flows.
 
 ## Engineering highlights
 
@@ -90,5 +94,6 @@ Tests use an isolated database and a fake AI provider, so they need no API key.
 
 ## Documentation
 
-- [Project guide](docs/NEXHIRE_PROJECT_GUIDE.md): architecture, trade-offs, code walkthrough, interview Q&A, and roadmap
+- [Architecture](docs/ARCHITECTURE.md): system design, data model, API, and key flows
+- [Project guide](docs/NEXHIRE_PROJECT_GUIDE.md): trade-offs, code walkthrough, interview Q&A, and roadmap
 - [Deployment guide](docs/DEPLOYMENT.md): Supabase, Render, and Vercel setup

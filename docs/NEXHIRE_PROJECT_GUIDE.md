@@ -41,9 +41,9 @@ Use this to understand every part of the project and defend it in an interview. 
 | Piece | Location |
 |---|---|
 | Source code | Your laptop and the public GitHub repo |
-| Frontend | Vercel (`nexhire-kappa.vercel.app`) |
-| Backend | Render (`nexhire-api-m82j.onrender.com`) |
-| Database | Hosted PostgreSQL from `DATABASE_URL` (the design doc specifies Supabase) |
+| Frontend | Vercel (`nexhire-app-six.vercel.app`) |
+| Backend | Render (`nexhire-backend-6rbj.onrender.com`) |
+| Database | Supabase PostgreSQL |
 | AI | Google Gemini API |
 | Local option | `docker compose up` runs everything except Gemini on your machine |
 

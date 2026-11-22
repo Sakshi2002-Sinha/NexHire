@@ -22,7 +22,7 @@ Use the Session pooler because Render's free tier may not reach Supabase's IPv6-
 ## 3. Deploy the API on Render
 
 1. In [Render](https://dashboard.render.com), choose **New > Blueprint**.
-2. Connect the `NexHire` repository and select the `feature/resume-intelligence` branch.
+2. Connect the `NexHire` repository and select the `main` branch.
 3. Enter these values:
 
 | Variable | Value |
@@ -39,7 +39,7 @@ Use the Session pooler because Render's free tier may not reach Supabase's IPv6-
 1. In [Vercel](https://vercel.com/new), import the `NexHire` repository.
 2. Set **Root Directory** to `frontend/nexhire-frontend`.
 3. Add the environment variable `VITE_API_URL` with your Render URL and no trailing slash.
-4. Deploy from the `feature/resume-intelligence` branch by making it the project's production branch.
+4. Deploy from the `main` branch.
 
 ## 5. Connect them
 
