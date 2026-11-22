@@ -1,18 +1,15 @@
-from dotenv import load_dotenv
-import os
 from sqlalchemy import create_engine
-# Load environment variables from .env file
-load_dotenv()
+from sqlalchemy.orm import declarative_base, sessionmaker
 
+from app.config import settings
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+_engine_options = {"pool_pre_ping": True}
+if settings.database_url.startswith("sqlite"):
+    _engine_options["connect_args"] = {"check_same_thread": False}
+else:
+    # Small pool: managed free-tier Postgres has a low connection limit.
+    _engine_options.update(pool_size=5, max_overflow=5, pool_timeout=10, pool_recycle=1800)
 
-from sqlalchemy.orm import sessionmaker
-# Create a SQLAlchemy engine
-engine = create_engine(DATABASE_URL)
-
-
+engine = create_engine(settings.database_url, **_engine_options)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-# add base
-from sqlalchemy.orm import declarative_base
 Base = declarative_base()

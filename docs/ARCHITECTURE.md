@@ -1,235 +1,235 @@
-# NexHire — Architecture
+# NexHire Architecture
 
-NexHire is an **AI mock-interview platform**. A user signs up, picks a role (SDE, ML Engineer, Product Manager) and a difficulty, optionally uploads a PDF resume, and then answers 5 AI-generated questions. Google Gemini generates each question and scores each answer on four dimensions. Results are saved, and the user can review past sessions and see progress on a dashboard.
-
----
+NexHire is an AI mock interview platform. A user can upload a resume, explore it as a skill tree, defend a specific project or claim, and track scored progress over time.
 
 ## 1. System overview
 
 ```mermaid
 flowchart LR
-    U[User browser] --> FE[React SPA<br/>Vite + Tailwind<br/>hosted on Vercel]
-    FE -- "REST + JWT (axios)" --> BE[FastAPI backend]
-    BE -- SQLAlchemy --> DB[(PostgreSQL)]
-    BE -- "google-generativeai SDK" --> AI[Gemini 2.5 Flash]
-    BE -- pypdf --> PDF[Resume text extraction]
+    U[User browser] --> FE["React SPA<br/>Vercel"]
+    FE -- "HTTPS + JWT" --> API["FastAPI API<br/>Render"]
+    API -- "SQLAlchemy" --> DB[("PostgreSQL<br/>Supabase")]
+    API -- "Structured JSON" --> AI["Google Gemini"]
+    API -- "pypdf" --> PDF["Resume text extraction"]
 ```
 
-| Layer | Tech | Location |
+| Layer | Technology | Location |
 |---|---|---|
-| Frontend | React 19, Vite 8, Tailwind 4, Redux Toolkit, React Router 7, Recharts, lucide-react | `frontend/nexhire-frontend/` |
-| Backend | FastAPI, SQLAlchemy (sync), Pydantic v2, python-jose (JWT), passlib/bcrypt | `backend/app/` |
-| Database | PostgreSQL (psycopg2), Alembic migrations | `backend/alembic/` |
-| AI | Google Gemini `gemini-2.5-flash` | `backend/app/services/gemini_service.py` |
-| Hosting | Frontend on Vercel (`nexhire-kappa.vercel.app`), SPA rewrite in `vercel.json` | backend host not defined in repo |
-
----
+| Frontend | React 19, Vite, Redux Toolkit, Tailwind CSS, Recharts, d3-hierarchy | `frontend/nexhire-frontend/` |
+| API | FastAPI, Pydantic, SQLAlchemy, python-jose, passlib/bcrypt | `backend/app/` |
+| Database | PostgreSQL with JSONB and Alembic migrations | `backend/alembic/` |
+| AI | Gemini through the `google-genai` SDK | `backend/app/services/gemini_service.py` |
+| Delivery | Docker Compose, GitHub Actions, Render, Vercel | repository root |
 
 ## 2. Repository layout
 
-```
+```text
 NexHire/
 ├── backend/
-│   ├── alembic/                 # DB migrations (users, interview tables, resumes, scores)
+│   ├── alembic/                  # Versioned schema migrations
 │   ├── app/
-│   │   ├── main.py              # FastAPI app, CORS, /register /login /me, router wiring
-│   │   ├── database.py          # engine, SessionLocal, Base (reads DATABASE_URL)
-│   │   ├── dependencies.py      # get_db() session-per-request
-│   │   ├── auth.py              # bcrypt hashing, JWT create/verify, get_current_user
-│   │   ├── models.py            # SQLAlchemy models
-│   │   ├── schemas.py           # Pydantic request/response models
-│   │   ├── routes/
-│   │   │   ├── auth.py          # placeholder router (/auth/test)
-│   │   │   ├── interview.py     # start / answer / end / detail / resume upload
-│   │   │   ├── history.py       # list sessions, session summary
-│   │   │   └── dashboard.py     # aggregated stats
-│   │   ├── services/
-│   │   │   ├── gemini_service.py   # generate_question, evaluate_answer
-│   │   │   ├── resume_services.py  # PDF -> text (pypdf)
-│   │   │   └── resume_parser.py    # keyword skill match + regex project extraction
-│   │   └── test_*.py            # ad-hoc scripts (not a pytest suite)
-│   └── requirements.txt
-└── frontend/nexhire-frontend/
-    ├── vercel.json              # SPA rewrite to index.html
-    └── src/
-        ├── App.jsx              # routes
-        ├── api/                 # axiosClient (+ JWT interceptor) and per-feature API calls
-        ├── store/               # Redux: authSlice, interviewSlice (async thunks)
-        ├── layouts/AppLayout.jsx
-        ├── pages/               # Login, Register, Dashboard, Interview, History, HistoryDetails
-        └── components/          # RoleSelector, QuestionCard, AnswerInput (voice), FeedbackPanel, SessionSummary, ...
+│   │   ├── main.py               # App setup, CORS, request IDs, /health, /ready
+│   │   ├── config.py             # Validated environment settings
+│   │   ├── models.py             # Tables, constraints, indexes
+│   │   ├── schemas.py            # Request and response contracts
+│   │   ├── auth.py               # Password hashing and JWT handling
+│   │   ├── limits.py             # Per-user and login limits
+│   │   ├── routes/               # HTTP layer
+│   │   └── services/             # Interview rules, AI, resume, speech metrics
+│   ├── evals/                    # AI scoring benchmark
+│   ├── scripts/run_demo.py       # Private local demo with sample data
+│   └── tests/                    # Automated backend tests
+├── frontend/nexhire-frontend/
+│   └── src/
+│       ├── api/                  # Axios client and API calls
+│       ├── store/                # Auth and interview state
+│       ├── pages/                # Route-level screens
+│       └── components/           # Interview, resume tree, charts, UI
+├── docs/
+├── docker-compose.yml
+└── render.yaml
 ```
-
----
 
 ## 3. Data model
 
 ```mermaid
 erDiagram
-    USERS ||--o{ INTERVIEW_SESSIONS : has
     USERS ||--o{ RESUMES : uploads
-    RESUMES |o--o{ INTERVIEW_SESSIONS : "personalises"
+    USERS ||--o{ INTERVIEW_SESSIONS : starts
+    RESUMES |o--o{ INTERVIEW_SESSIONS : personalizes
     INTERVIEW_SESSIONS ||--o{ QUESTIONS : contains
-    QUESTIONS ||--o| ANSWERS : "answered by"
+    QUESTIONS ||--o| ANSWERS : receives
 
-    USERS { string id PK; string email UK; string hashed_password; string name; datetime created_at }
-    RESUMES { string id PK; string user_id FK; string filename; text extracted_text; json skills; json projects; datetime uploaded_at }
-    INTERVIEW_SESSIONS { string id PK; string user_id FK; string resume_id FK; string role; string difficulty; string status; float total_score; datetime created_at; datetime completed_at }
-    QUESTIONS { string id PK; string session_id FK; text question_text; int question_order; datetime created_at }
-    ANSWERS { string id PK; string question_id FK; text answer_text; int score; int communication_score; int technical_depth_score; int problem_solving_score; int confidence_score; text feedback; text strengths; text improvements; datetime created_at }
+    USERS {
+        string id PK
+        string email UK
+        string hashed_password
+        string name
+        datetime created_at
+    }
+    RESUMES {
+        string id PK
+        string user_id FK
+        string filename
+        text extracted_text
+        json skills
+        json projects
+        jsonb profile
+        datetime uploaded_at
+    }
+    INTERVIEW_SESSIONS {
+        string id PK
+        string user_id FK
+        string resume_id FK
+        string role
+        string difficulty
+        string status
+        float total_score
+        float communication_avg
+        float technical_depth_avg
+        float problem_solving_avg
+        float confidence_avg
+        text summary
+        jsonb focus
+        datetime created_at
+        datetime completed_at
+    }
+    QUESTIONS {
+        string id PK
+        string session_id FK
+        text question_text
+        int question_order
+        boolean is_followup
+        datetime created_at
+    }
+    ANSWERS {
+        string id PK
+        string question_id FK
+        text answer_text
+        int score
+        int communication_score
+        int technical_depth_score
+        int problem_solving_score
+        int confidence_score
+        text feedback
+        jsonb strengths
+        jsonb improvements
+        jsonb weak_topics
+        jsonb speech
+        datetime created_at
+    }
 ```
 
-- All IDs are UUID strings.
-- `status` is `active` → `completed`.
-- `strengths` / `improvements` are stored as a JSON array in a Text column (`app/utils.py` `dump_list` / `load_list`). Older rows used `", "`-joined text; `load_list` reads both.
-- Schema is created two ways: Alembic migrations **and** `Base.metadata.create_all()` at app startup.
+| Rule | Enforcement | Why it matters |
+|---|---|---|
+| One active interview per user | Partial unique index on `user_id` where `status = 'active'` | Two tabs cannot start competing interviews |
+| One answer per question | Unique `answers.question_id` | Duplicate submissions are idempotent |
+| One question per position | Unique `(session_id, question_order)` | Concurrent requests cannot create duplicate next questions |
+| User deletion removes owned data | `ON DELETE CASCADE` | No orphaned personal data |
+| Resume deletion keeps history | `ON DELETE SET NULL` | Past interviews remain readable |
 
----
+## 4. API
 
-## 4. API reference
-
-All routes except `/`, `/register`, `/login` need `Authorization: Bearer <jwt>`.
+Everything except registration, login, `/health`, and `/ready` requires `Authorization: Bearer <token>`.
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/register` | Create user (`email`, `password`, `name`) |
-| POST | `/login` | OAuth2 form (`username`=email, `password`) → `{access_token}` (60 min, HS256) |
-| GET | `/me` | Current user |
-| POST | `/interview/upload` | Multipart PDF → extract text, skills, projects → `resume_id` |
-| POST | `/interview/start` | `{role, difficulty, resume_id?}` → new session + first question |
-| POST | `/interview/answer` | `{session_id, question_id, answer}` → scores + feedback + next question (null after Q5) |
-| POST | `/interview/end` | `{session_id}` → averages score, marks completed |
-| GET | `/interview/{session_id}` | Full session with Q&A and feedback |
-| GET | `/history/` | List user's sessions (newest first) |
-| GET | `/history/{session_id}` | One session summary |
-| GET | `/dashboard/stats` | Avg score by role, score over time, top 5 "weak topics" |
+| POST | `/auth/register` | Create an account |
+| POST | `/auth/login` | Return a JWT |
+| GET | `/auth/me` | Return the current user |
+| POST | `/interview/upload` | Validate and analyze a PDF resume |
+| POST | `/interview/start` | Start a standard interview or Resume Defense |
+| GET | `/interview/active` | Restore an active interview after refresh |
+| POST | `/interview/answer` | Score an answer and prepare the next question |
+| POST | `/interview/end` | Complete the session and build its report |
+| GET | `/interview/{session_id}` | Read a full session |
+| GET | `/resumes` | List the user's resumes |
+| GET | `/resumes/{resume_id}/tree` | Read the resume tree and mastery status |
+| POST | `/resumes/{resume_id}/analyze` | Rebuild the structured resume profile |
+| GET | `/history` | List past sessions |
+| GET | `/history/{session_id}` | Read one past session |
+| GET | `/dashboard/stats` | Read trends, skill averages, and weak topics |
+| GET | `/health` | Check that the process is running |
+| GET | `/ready` | Check that the database is reachable |
 
----
+## 5. Key flows
 
-## 5. End-to-end flows
-
-### 5.1 Auth
+### Submit an answer
 
 ```mermaid
 sequenceDiagram
     participant FE as React
-    participant BE as FastAPI
-    participant DB as Postgres
-    FE->>BE: POST /login (form: username, password)
-    BE->>DB: find user by email
-    BE->>BE: bcrypt verify → sign JWT {sub: email, exp: +60m}
-    BE-->>FE: access_token
-    FE->>FE: localStorage.token = jwt
-    FE->>BE: GET /me (Bearer)
-    BE-->>FE: {id, email, name} → Redux auth.user
+    participant API as FastAPI
+    participant DB as PostgreSQL
+    participant AI as Gemini
+
+    FE->>API: POST /interview/answer
+    API->>DB: Load session and question for this user
+    alt Answer already exists
+        DB-->>API: Saved answer
+        API-->>FE: Return saved result
+    else New answer
+        API->>DB: End read transaction
+        API->>AI: Score answer and draft next question
+        AI-->>API: Validated JSON
+        API->>DB: Save answer and next question
+        API-->>FE: Feedback and next step
+    end
 ```
 
-- `axiosClient` attaches the token on every request; any `401` clears it and redirects to `/login`.
-- `ProtectedRoute` only checks that a token **exists** (not that it is valid).
+No database transaction stays open during the Gemini call, so slow AI responses do not hold a connection. If evaluation fails, the API returns a retryable error and does not store a made-up score.
 
-### 5.2 Interview
+### Resume Defense
 
 ```mermaid
-sequenceDiagram
-    participant FE as InterviewPage (Redux)
-    participant BE as /interview
-    participant G as Gemini
-    participant DB as Postgres
-
-    opt Resume
-      FE->>BE: POST /upload (PDF)
-      BE->>BE: pypdf text → keyword skills, regex projects
-      BE->>DB: insert resume
-      BE-->>FE: resume_id, skills, projects
-    end
-    FE->>BE: POST /start {role, difficulty, resume_id}
-    BE->>DB: insert session
-    BE->>G: generate_question(role, difficulty, resume)
-    BE->>DB: insert question #1
-    BE-->>FE: session_id, question
-    loop up to 5 questions
-      FE->>BE: POST /answer {session_id, question_id, answer}
-      BE->>G: evaluate_answer → JSON scores
-      BE->>DB: insert answer
-      alt fewer than 5 questions
-        BE->>G: generate_question(role, difficulty)
-        BE->>DB: insert next question
-      end
-      BE-->>FE: feedback + next_question (or null)
-    end
-    FE->>BE: POST /end
-    BE->>DB: total_score = avg(answer.score); status=completed
-    BE-->>FE: total_score, strengths, improvements
+flowchart LR
+    A[Upload PDF] --> B[Redact contact details]
+    B --> C[Extract structured profile]
+    C --> D[Store profile in JSONB]
+    D --> E[Render skill tree]
+    E --> F[Choose project or claim]
+    F --> G[Three-question defense]
+    G --> H{Latest score}
+    H -->|7 or higher| I[Verified]
+    H -->|5 to below 7| J[Developing]
+    H -->|Below 5| K[Weak]
 ```
 
-**Frontend state machine** (`interviewSlice`): `idle` → (`startInterview`) → `active` → show question → `submitAnswer` → show `FeedbackPanel` → `loadNextQuestion` … → `endInterview` → `completed` → `SessionSummary`.
+The chosen claim is copied into `interview_sessions.focus`, so editing or re-analyzing a resume does not change past interviews.
 
-`AnswerInput` supports voice answers through the browser Web Speech API.
+### Adaptive interview
 
-### 5.3 AI layer (`gemini_service.py`)
+A standard interview has up to 5 questions. An answer scoring below 7 can trigger one targeted follow-up. One Gemini request both evaluates the answer and drafts the next question, which reduces quota use.
 
-- **generate_question** — prompt includes role, difficulty, resume skills/projects, and every question already asked in the session. Returns `None` on error; the route (`_next_question_text`) then picks an unused canned question for that role.
-- **evaluate_answer** — asks for strict JSON (`score`, `communication`, `technical_depth`, `problem_solving`, `confidence` 0–10, `strengths[]`, `improvements[]`, `feedback`). Strips code fences, `json.loads`, clamps scores to 0–10 integers. On any failure returns neutral 5/10 scores.
+### Speech Coach
 
-**Interview rules enforced by the API:** a question must belong to the session, each question can be answered once (409), a finished interview can't take answers (400), and a resume can only be used by its owner (404).
+The browser's Web Speech API creates the transcript. The server calculates pace, filler words, pauses, and talk time from the submitted metrics, so speech coaching adds no paid speech API.
 
-**Frontend persistence:** the interview Redux slice is saved to `localStorage` (`nexhire_interview`), so a refresh resumes the interview. It's cleared on logout, on a 401, and when leaving the summary screen. The navbar re-fetches `/me` after a refresh.
-- Calls are **synchronous and blocking** inside request handlers.
+## 6. Reliability and security
 
-### 5.4 History & dashboard
+- **AI output:** responses are schema-validated, scores are clamped, and transient failures are retried.
+- **Quota protection:** each user has per-minute AI limits and 3 interview starts per day by default.
+- **Access control:** every session and resume lookup is scoped to the authenticated user.
+- **Prompt safety:** user text is fenced as data, and contact details are removed before resume analysis.
+- **Uploads:** resumes are limited to 5 MB and validated before parsing.
+- **Operations:** each response has an `X-Request-ID`, and `/ready` verifies database access.
 
-- History lists sessions; details page calls `GET /interview/{id}`.
-- Dashboard computes everything in Python per request: per-role averages, score timeline, and "weak topics" = most frequent comma-split `improvements` entries.
+## 7. Configuration
 
----
-
-## 6. Configuration
-
-| Var | Where | Purpose |
+| Variable | Required | Purpose |
 |---|---|---|
-| `DATABASE_URL` | backend `.env` | Postgres connection string |
-| `SECRET_KEY` | backend `.env` | JWT signing key |
-| `GEMINI_API_KEY` | backend `.env` | Gemini access |
-| `VITE_API_URL` | frontend env | Backend base URL |
+| `DATABASE_URL` | Yes | Runtime PostgreSQL connection |
+| `DIRECT_URL` | For migrations | Migration connection |
+| `SECRET_KEY` | Yes | JWT signing key, at least 32 characters |
+| `GEMINI_API_KEY` | For AI | Gemini access |
+| `GEMINI_MODEL` | No | Defaults to `gemini-3.1-flash-lite` |
+| `CORS_ORIGINS` | Production | Exact allowed website origins, with no trailing slash |
+| `DAILY_INTERVIEWS` | No | Interview starts per user per day, default 3 |
+| `VITE_API_URL` | Frontend | API base URL, with no trailing slash |
 
-CORS origins are hard-coded in `main.py` (localhost:5173 and the Vercel URL).
+## 8. Known limitations
 
-### Running locally
-
-```bash
-# backend
-cd backend
-pip install -r requirements.txt
-alembic upgrade head
-uvicorn app.main:app --reload
-
-# frontend
-cd frontend/nexhire-frontend
-npm install
-npm run dev
-```
-
----
-
-## 7. Known issues & tech debt
-
-### Fixed (Nov 2026)
-- Timestamps were frozen at server start (`default=datetime.now(UTC)` evaluated once); now a lambda.
-- Questions 2–5 ignored history and resume, so they could repeat; both are now passed to Gemini, and fallbacks never repeat.
-- Missing ownership checks on question / resume; duplicate answers and answers after the interview ended were allowed.
-- Detail endpoint dropped the four sub-scores.
-- Dashboard "weak topics" split sentences on commas; the score timeline wasn't sorted.
-- Interview and user name were lost on page refresh; "Start new interview" on the summary showed the old summary again.
-- Progress bar had 3 dots for 5 questions; API errors showed generic axios text.
-- A wrong password reloaded the login page (401 interceptor), hiding the error.
-- 422 validation errors crashed the login/register pages (React tried to render the error list).
-- `venv/` and `__pycache__/` untracked; `requirements.txt` converted from UTF-16 and pinned; `DATABASE_URL` no longer printed.
-
-### Still open
-- `create_all()` at startup competes with Alembic — pick Alembic only (check the backend host's deploy steps first).
-- Empty `routes/auth.py` while auth lives in `main.py`; duplicate imports in `main.py`.
-- `google-generativeai` is the deprecated SDK; the successor is `google-genai`.
-- No automated tests (`test_*.py` are manual scripts), no CI, no backend deploy config in the repo.
-- Gemini calls block the worker; no rate limiting on AI endpoints.
-- `ProtectedRoute` only checks that a token exists; JWT expiry (60 min) logs the user out mid-interview.
-- Weak topics are still whole AI sentences; topic tagging per question would make them useful.
+- The in-memory rate limiter is correct for one API instance. Multiple instances need Redis.
+- Gemini calls run in FastAPI's worker threads. Higher traffic should move them to a job queue.
+- The JWT is stored in `localStorage`. A stronger production setup would use short-lived tokens with an HttpOnly refresh cookie.
+- Render's free service sleeps when idle, so the first request can take up to a minute.
